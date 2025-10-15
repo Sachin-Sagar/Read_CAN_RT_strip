@@ -3,7 +3,9 @@
 import cantools
 import os
 import queue
+import json
 from datetime import datetime
+import can
 
 # Import custom modules and configuration
 import config
@@ -17,9 +19,8 @@ def main():
     """
     print("--- Real-Time CAN Logger ---")
 
-    # --- 1. Load and Separate Signals by Frequency ---
+    # --- 1. Load Configuration ---
     print("\n[+] Loading configuration...")
-
     dbc_path = os.path.join(config.INPUT_DIRECTORY, config.DBC_FILE)
     signal_list_path = os.path.join(config.INPUT_DIRECTORY, config.SIGNAL_LIST_FILE)
 
@@ -30,15 +31,12 @@ def main():
         print(f"Error: Failed to parse DBC file '{dbc_path}': {e}. Exiting.")
         return
 
-    # Load signals and separate them based on the new format
     high_freq_signals, low_freq_signals, id_to_queue_map = utils.load_signals_to_monitor(signal_list_path)
-    if id_to_queue_map is None:
-        return
+    if id_to_queue_map is None: return
 
-    # Combine all signals for the final report
     all_monitoring_signals = {s for group in (high_freq_signals, low_freq_signals) for sig_set in group.values() for s in sig_set}
     total_signals = len(all_monitoring_signals)
-    print(f" -> Signal list loaded. Monitoring {total_signals} signals ({len(high_freq_signals)} high-freq IDs, {len(low_freq_signals)} low-freq IDs).")
+    print(f" -> Signal list loaded. Monitoring {total_signals} signals.")
 
     os.makedirs(config.OUTPUT_DIRECTORY, exist_ok=True)
     timestamp_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -46,85 +44,68 @@ def main():
     output_filepath = os.path.join(config.OUTPUT_DIRECTORY, output_filename)
     print(f" -> Output will be saved to: '{output_filepath}'")
 
-    # --- 2. Initialize Parallel Pipelines ---
+    # --- 2. Initialize Pipelines and Hardware ---
     print("\n[+] Initializing worker threads...")
-    
-    # Create separate raw message queues for each frequency
-    raw_queues = {
-        'high': queue.Queue(maxsize=1000),
-        'low': queue.Queue(maxsize=500)
-    }
-    # Create a single queue for the final JSON strings
-    processed_log_queue = queue.Queue(maxsize=2000)
-
+    raw_queues = {'high': queue.Queue(maxsize=2000), 'low': queue.Queue(maxsize=500)}
+    processed_log_queue = queue.Queue(maxsize=4000)
     data_tracker = {'successfully_logged_signals': set(), 'decode_errors_printed': set()}
 
-    # Thread 1: The dispatcher reading from hardware
-    dispatcher_thread = CANReader(
-        interface=config.CAN_INTERFACE,
-        channel=config.CAN_CHANNEL,
-        bitrate=config.CAN_BITRATE,
-        data_queues=raw_queues,
-        id_to_queue_map=id_to_queue_map
-    )
-    dispatcher_thread.start()
-
-    # Wait for the connection to be confirmed
+    bus = None
     try:
-        # The success message is always sent to the 'low' queue
-        status = raw_queues['low'].get(timeout=5)
-        if status != "CONNECTION_SUCCESS":
-            print(status)
-            dispatcher_thread.stop(); dispatcher_thread.join()
-            return
-    except queue.Empty:
-        print("\nError: Connection to CAN hardware timed out.")
-        dispatcher_thread.stop(); dispatcher_thread.join()
-        return
+        print(" -> Connecting to CAN hardware...")
+        bus = can.interface.Bus(
+            interface=config.CAN_INTERFACE, channel=config.CAN_CHANNEL,
+            bitrate=config.CAN_BITRATE, receive_own_messages=False
+        )
+        print(f" -> Connection successful on '{config.CAN_INTERFACE}' channel {config.CAN_CHANNEL}.")
 
-    print(f" -> Connection successful on '{config.CAN_INTERFACE}' channel {config.CAN_CHANNEL}.")
+        # --- Initialize and start all threads ---
+        dispatcher_thread = CANReader(bus=bus, data_queues=raw_queues, id_to_queue_map=id_to_queue_map)
+        
+        high_freq_processor = DataProcessor(
+            db=db, signals_to_monitor=high_freq_signals, raw_queue=raw_queues['high'],
+            log_queue=processed_log_queue, data_tracker=data_tracker
+        )
+        low_freq_processor = DataProcessor(
+            db=db, signals_to_monitor=low_freq_signals, raw_queue=raw_queues['low'],
+            log_queue=processed_log_queue, data_tracker=data_tracker
+        )
 
-    # Thread 2: Processor for high-frequency (10ms) signals
-    high_freq_processor = DataProcessor(
-        db=db, signals_to_monitor=high_freq_signals, raw_queue=raw_queues['high'],
-        log_queue=processed_log_queue, data_tracker=data_tracker
-    )
-    
-    # Thread 3: Processor for low-frequency (100ms) signals
-    low_freq_processor = DataProcessor(
-        db=db, signals_to_monitor=low_freq_signals, raw_queue=raw_queues['low'],
-        log_queue=processed_log_queue, data_tracker=data_tracker
-    )
+        dispatcher_thread.start()
+        high_freq_processor.start()
+        low_freq_processor.start()
 
-    high_freq_processor.start()
-    low_freq_processor.start()
+        print("\n[+] Logging data... Press Ctrl+C to stop.")
 
-    print("\n[+] Logging data... Press Ctrl+C to stop.")
-
-    # --- 3. Main Logging Loop (File I/O) ---
-    try:
+        # --- 3. Main Logging Loop (File I/O) ---
         with open(output_filepath, 'a') as log_file:
             while True:
                 try:
-                    log_line = processed_log_queue.get(timeout=3.0)
+                    log_entry_dict = processed_log_queue.get(timeout=3.0)
+                    log_line = json.dumps(log_entry_dict) + '\n'
                     log_file.write(log_line)
                 except queue.Empty:
-                    print(" -> Waiting for processed data...")
+                    if not dispatcher_thread.is_alive():
+                        print(" -> Dispatcher thread has stopped. Exiting.")
+                        break
                     continue
 
+    except can.CanError as e:
+        print(f"\nFATAL ERROR: Failed to connect to or read from the CAN bus: {e}")
     except KeyboardInterrupt:
         print("\n\n[+] Ctrl+C detected. Shutting down gracefully...")
-
     finally:
         # --- 4. Cleanup and Shutdown ---
         print(" -> Stopping worker threads...")
-        dispatcher_thread.stop()
-        high_freq_processor.stop()
-        low_freq_processor.stop()
+        if 'dispatcher_thread' in locals() and dispatcher_thread.is_alive(): dispatcher_thread.stop()
+        if 'high_freq_processor' in locals() and high_freq_processor.is_alive(): high_freq_processor.stop()
+        if 'low_freq_processor' in locals() and low_freq_processor.is_alive(): low_freq_processor.stop()
+
+        if 'dispatcher_thread' in locals(): dispatcher_thread.join(timeout=1)
+        if 'high_freq_processor' in locals(): high_freq_processor.join(timeout=1)
+        if 'low_freq_processor' in locals(): low_freq_processor.join(timeout=1)
         
-        dispatcher_thread.join(timeout=2)
-        high_freq_processor.join(timeout=2)
-        low_freq_processor.join(timeout=2)
+        if bus: bus.shutdown()
         print(" -> Worker threads stopped.")
         
         # --- 5. Final Report ---

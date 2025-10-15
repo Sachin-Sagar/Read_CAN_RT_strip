@@ -6,16 +6,6 @@ def load_signals_to_monitor(file_path):
     """
     Parses the signal list file (format: CAN_ID,Signal_Name,CycleTime) and
     creates dictionaries to separate high-frequency and low-frequency signals.
-
-    Args:
-        file_path (str): The full path to the signal list text file.
-
-    Returns:
-        tuple: A tuple containing (high_freq_signals, low_freq_signals, id_to_queue_map).
-               - high_freq_signals (dict): For 10ms signals.
-               - low_freq_signals (dict): For 100ms signals.
-               - id_to_queue_map (dict): Maps a CAN ID to 'high' or 'low'.
-               Returns (None, None, None) if the file is not found or is empty.
     """
     high_freq_signals = {}
     low_freq_signals = {}
@@ -24,18 +14,18 @@ def load_signals_to_monitor(file_path):
     try:
         with open(file_path, 'r') as f:
             for line_num, line in enumerate(f, 1):
-                # Skip empty lines or lines that are just comments
                 if not line.strip() or line.strip().startswith('#'):
                     continue
 
-                # Split by comma and strip whitespace from parts
                 parts = [p.strip() for p in line.split(',')]
                 
                 if len(parts) == 3:
-                    can_id, signal_name, cycle_time = parts
+                    can_id_raw, signal_name, cycle_time = parts
                     
+                    # Normalize the CAN ID to lowercase to prevent case-sensitivity issues.
+                    can_id = can_id_raw.lower()
+
                     try:
-                        # Validate that cycle time is an integer
                         rate = int(cycle_time)
                         if rate == 10:
                             if can_id not in high_freq_signals:

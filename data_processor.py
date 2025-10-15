@@ -3,14 +3,15 @@
 import threading
 import json
 import queue
-import can # Import the can library to check the message type
+import can
 from datetime import datetime
 from cantools.database.namedsignalvalue import NamedSignalValue
 
 class DataProcessor(threading.Thread):
     """
     A class for processing raw CAN messages in a dedicated thread.
-    It decodes messages, formats them into JSON, and passes them to a logging queue.
+    It decodes messages, formats them into Python dictionaries, and passes
+    them to a logging queue.
     """
     def __init__(self, db, signals_to_monitor, raw_queue, log_queue, data_tracker):
         super().__init__(daemon=True)
@@ -27,12 +28,10 @@ class DataProcessor(threading.Thread):
             try:
                 msg = self.raw_queue.get(timeout=0.1)
                 
-                # --- FIX 1: IGNORE NON-MESSAGE OBJECTS ---
-                # Check if the received item is a CAN message. If not, skip it.
                 if not isinstance(msg, can.Message):
                     continue
 
-                msg_id_hex = f"0x{msg.arbitration_id:X}"
+                msg_id_hex = f"0x{msg.arbitration_id:x}" # Use lowercase for consistency
                 if msg_id_hex in self.signals_to_monitor:
                     try:
                         decoded_signals = self.db.decode_message(msg.arbitration_id, msg.data)
@@ -47,7 +46,7 @@ class DataProcessor(threading.Thread):
                                     "value": log_value
                                 }
                                 
-                                self.log_queue.put(json.dumps(log_entry) + '\n')
+                                self.log_queue.put(log_entry)
                                 self.data_tracker['successfully_logged_signals'].add(signal_name)
 
                     except KeyError:
@@ -59,7 +58,6 @@ class DataProcessor(threading.Thread):
                             print(f"\nWarning: ProcThread encountered an error on {msg_id_hex}: {e}")
                             self.data_tracker['decode_errors_printed'].add(msg_id_hex)
             
-            # --- FIX 2: CATCH THE CORRECT EXCEPTION ---
             except queue.Empty:
                 continue
     
