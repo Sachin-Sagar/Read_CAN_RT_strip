@@ -11,10 +11,21 @@ build-backend = "setuptools.build_meta"
 name = "can-logger"
 version = "0.1.0"
 description = "A lightweight, real-time CAN bus logger that saves specific signals to a JSON file."
-
+requires-python = ">=3.10"
 # Lists the packages required for the project to run.
 # uv or pip will install these when you set up the environment.
 dependencies = [
     "python-can",
     "cantools",
+]
+
+# Add tool-specific configuration for setuptools here.
+[tool.setuptools]
+# Explicitly list the Python modules that make up the application.
+# This prevents setuptools from getting confused by the 'input' and 'output' directories.
+py-modules = [
+    "main",
+    "config",
+    "can_handler",
+    "utils"
 ]

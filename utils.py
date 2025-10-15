@@ -4,20 +4,23 @@ import os
 
 def load_signals_to_monitor(file_path):
     """
-    Parses the signal list file and creates a dictionary for quick lookups.
-
-    The dictionary maps a CAN ID (as a string, e.g., '0x123') to a set of
-    signal names that should be monitored for that specific ID. Using a set
-    provides fast membership checking.
+    Parses the signal list file (format: CAN_ID,Signal_Name,CycleTime) and
+    creates dictionaries to separate high-frequency and low-frequency signals.
 
     Args:
         file_path (str): The full path to the signal list text file.
 
     Returns:
-        dict: A dictionary where keys are CAN IDs and values are sets of signal names.
-              Returns None if the file is not found.
+        tuple: A tuple containing (high_freq_signals, low_freq_signals, id_to_queue_map).
+               - high_freq_signals (dict): For 10ms signals.
+               - low_freq_signals (dict): For 100ms signals.
+               - id_to_queue_map (dict): Maps a CAN ID to 'high' or 'low'.
+               Returns (None, None, None) if the file is not found or is empty.
     """
-    signals = {}
+    high_freq_signals = {}
+    low_freq_signals = {}
+    id_to_queue_map = {}
+
     try:
         with open(file_path, 'r') as f:
             for line_num, line in enumerate(f, 1):
@@ -28,21 +31,36 @@ def load_signals_to_monitor(file_path):
                 # Split by comma and strip whitespace from parts
                 parts = [p.strip() for p in line.split(',')]
                 
-                if len(parts) == 2:
-                    can_id, signal_name = parts
-                    # Add the CAN ID to the dictionary if it's not already there
-                    if can_id not in signals:
-                        signals[can_id] = set()
-                    # Add the signal name to the set for that ID
-                    signals[can_id].add(signal_name)
+                if len(parts) == 3:
+                    can_id, signal_name, cycle_time = parts
+                    
+                    try:
+                        # Validate that cycle time is an integer
+                        rate = int(cycle_time)
+                        if rate == 10:
+                            if can_id not in high_freq_signals:
+                                high_freq_signals[can_id] = set()
+                            high_freq_signals[can_id].add(signal_name)
+                            id_to_queue_map[can_id] = 'high'
+                        elif rate == 100:
+                            if can_id not in low_freq_signals:
+                                low_freq_signals[can_id] = set()
+                            low_freq_signals[can_id].add(signal_name)
+                            id_to_queue_map[can_id] = 'low'
+                        else:
+                            print(f"Warning: Skipping line {line_num}. Cycle time must be 10 or 100, but got {rate}.")
+                            continue
+                    except ValueError:
+                        print(f"Warning: Skipping malformed line {line_num}. Cycle time '{cycle_time}' is not a valid integer.")
+                        continue
                 else:
-                    print(f"Warning: Skipping malformed line {line_num} in '{file_path}': {line.strip()}")
+                    print(f"Warning: Skipping malformed line {line_num} in '{file_path}'. Expected 3 parts, got {len(parts)}.")
 
     except FileNotFoundError:
         print(f"Error: Signal list file not found at '{file_path}'.")
-        return None
+        return None, None, None
     
-    if not signals:
-        print(f"Warning: No valid signals were loaded from '{file_path}'. The logger will not record any data.")
+    if not high_freq_signals and not low_freq_signals:
+        print(f"Warning: No valid signals were loaded from '{file_path}'.")
         
-    return signals
+    return high_freq_signals, low_freq_signals, id_to_queue_map

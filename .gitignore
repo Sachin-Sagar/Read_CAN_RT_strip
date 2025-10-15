@@ -12,3 +12,6 @@ wheels/
 can_logger.egg-info
 input
 output
+
+.python-version
+.vscode/
