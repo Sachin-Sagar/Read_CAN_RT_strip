@@ -25,6 +25,8 @@ def main():
 
     os.makedirs(config.OUTPUT_DIRECTORY, exist_ok=True)
     timestamp_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    # --- BUG FIX from previous step: Define the output filename ---
+    output_filename = f"can_log_{timestamp_str}.json"
     output_filepath = os.path.join(config.OUTPUT_DIRECTORY, output_filename)
     print(f" -> Output will be saved to: '{output_filepath}'")
 
@@ -47,7 +49,9 @@ def main():
         high_freq_processor.start()
         low_freq_processor.start()
 
-        print("\n[+] Logging data... Press Ctrl+C to stop.")
+        # --- NEW MESSAGE ---
+        print("\n[+] System is running. Actively listening for CAN bus traffic...")
+        print("    Press Ctrl+C to stop logging.")
 
         # Main loop: Move messages from C queue to Python processor queues
         dispatcher_is_running = True
