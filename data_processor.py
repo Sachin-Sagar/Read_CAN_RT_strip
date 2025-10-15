@@ -46,7 +46,10 @@ class DataProcessor(threading.Thread):
                                     "value": log_value
                                 }
                                 
-                                self.log_queue.put(log_entry)
+                                try:
+                                    self.log_queue.put(log_entry, timeout=0.01)
+                                except queue.Full:
+                                    print(f"Warning: Final log queue is full. Log entry for '{signal_name}' dropped.")
                                 self.data_tracker['successfully_logged_signals'].add(signal_name)
 
                     except KeyError:
