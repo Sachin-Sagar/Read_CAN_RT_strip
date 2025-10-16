@@ -16,9 +16,14 @@ def main():
     print(f"Attempting to connect to {CAN_INTERFACE} channel {CAN_CHANNEL} at {CAN_BITRATE} bps...")
     
     bus = None
+    # --- Performance Tracking Variables ---
+    total_recv_time = 0
+    total_print_time = 0
+    msg_count = 0
+    start_time = 0
+    # ------------------------------------
+
     try:
-        # We use a simple blocking reader here for simplicity.
-        # This is the most direct way to read from the bus.
         bus = can.interface.Bus(
             interface=CAN_INTERFACE,
             channel=CAN_CHANNEL,
@@ -30,14 +35,24 @@ def main():
         print("Press Ctrl+C to stop.")
         
         start_time = time.time()
-        msg_count = 0
         
         while True:
-            msg = bus.recv(timeout=1.0) # Wait up to 1 second for a message
+            # --- Time the bus.recv() call ---
+            recv_start = time.perf_counter()
+            msg = bus.recv(timeout=1.0)
+            recv_end = time.perf_counter()
+            total_recv_time += (recv_end - recv_start)
+            # ---------------------------------
+            
             if msg:
                 msg_count += 1
-                # Print the ID in both decimal and hex for clarity
+                
+                # --- Time the print operation ---
+                print_start = time.perf_counter()
                 print(f"Received: ID=0x{msg.arbitration_id:03x} ({msg.arbitration_id:4d}) | Timestamp={msg.timestamp:.4f}")
+                print_end = time.perf_counter()
+                total_print_time += (print_end - print_start)
+                # --------------------------------
             else:
                 print(" -> No messages received in the last second.")
 
@@ -51,9 +66,18 @@ def main():
         
         end_time = time.time()
         duration = end_time - start_time
-        if duration > 0:
+        if duration > 0 and msg_count > 0:
             rate = msg_count / duration
-            print(f"Received {msg_count} messages in {duration:.2f} seconds ({rate:.2f} msg/s).")
+            print(f"\nReceived {msg_count} messages in {duration:.2f} seconds ({rate:.2f} msg/s).")
+
+            # --- Performance Report ---
+            avg_recv = (total_recv_time / msg_count) * 1_000_000 # to microseconds
+            avg_print = (total_print_time / msg_count) * 1_000_000 # to microseconds
+            print("\n--- Performance Report ---")
+            print(f"Avg. Receive Time: {avg_recv:.2f} µs/msg")
+            print(f"Avg. Print Time  : {avg_print:.2f} µs/msg")
+            print("--------------------------")
+
 
 if __name__ == "__main__":
     main()

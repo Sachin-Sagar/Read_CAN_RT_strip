@@ -1,65 +1,67 @@
 # data_processor.py
 
-import threading
-import json
-import queue
 import can
-from datetime import datetime
-from cantools.database.namedsignalvalue import NamedSignalValue
+import time
+import struct
+import queue
 
-class DataProcessor(threading.Thread):
+LOG_ENTRY_FORMAT = struct.Struct('=dI32sd')
+
+def processing_worker(decoding_rules, raw_queue, index_queue, shared_mem_array, results_queue, perf_tracker):
     """
-    A class for processing raw CAN messages in a dedicated thread.
-    It decodes messages, formats them into Python dictionaries, and passes
-    them to a logging queue.
+    Worker that decodes signals, writes to shared memory, and reports
+    processed signals via a dedicated results queue.
     """
-    def __init__(self, db, signals_to_monitor, raw_queue, log_queue, data_tracker):
-        super().__init__(daemon=True)
-        self.db = db
-        self.signals_to_monitor = signals_to_monitor
-        self.raw_queue = raw_queue
-        self.log_queue = log_queue
-        self.data_tracker = data_tracker
-        self._is_running = threading.Event()
+    mem_view = memoryview(shared_mem_array)
+    num_slots = len(shared_mem_array) // LOG_ENTRY_FORMAT.size
+    current_slot = 0
+    local_logged_signals = set()
 
-    def run(self):
-        self._is_running.set()
-        while self._is_running.is_set():
-            try:
-                msg = self.raw_queue.get(timeout=0.1)
-                
-                if not isinstance(msg, can.Message):
-                    continue
+    while True:
+        try:
+            msg = raw_queue.get()
 
-                msg_id_hex = f"0x{msg.arbitration_id:x}" # Use lowercase for consistency
-                if msg_id_hex in self.signals_to_monitor:
-                    try:
-                        decoded_signals = self.db.decode_message(msg.arbitration_id, msg.data)
-                        for signal_name, value in decoded_signals.items():
-                            if signal_name in self.signals_to_monitor[msg_id_hex]:
-                                log_value = value.value if isinstance(value, NamedSignalValue) else value
-                                
-                                log_entry = {
-                                    "timestamp": datetime.fromtimestamp(msg.timestamp).isoformat(),
-                                    "message_id": msg_id_hex,
-                                    "signal": signal_name,
-                                    "value": log_value
-                                }
-                                
-                                self.log_queue.put(log_entry)
-                                self.data_tracker['successfully_logged_signals'].add(signal_name)
+            if msg is None:
+                # --- FIXED: Report results to the dedicated queue ---
+                results_queue.put(local_logged_signals)
+                raw_queue.task_done()
+                break
 
-                    except KeyError:
-                        if msg_id_hex not in self.data_tracker['decode_errors_printed']:
-                            print(f"\nWarning: ProcThread failed to decode {msg_id_hex}. Possible DBC mismatch.")
-                            self.data_tracker['decode_errors_printed'].add(msg_id_hex)
-                    except Exception as e:
-                        if msg_id_hex not in self.data_tracker['decode_errors_printed']:
-                            print(f"\nWarning: ProcThread encountered an error on {msg_id_hex}: {e}")
-                            self.data_tracker['decode_errors_printed'].add(msg_id_hex)
-            
-            except queue.Empty:
+            if not isinstance(msg, can.Message):
+                raw_queue.task_done()
                 continue
-    
-    def stop(self):
-        self._is_running.clear()
+            
+            start_time = time.perf_counter()
+
+            if msg.arbitration_id in decoding_rules:
+                rules = decoding_rules[msg.arbitration_id]
+                data_int = int.from_bytes(msg.data, byteorder='little')
+
+                for name, is_signed, start, length, scale, offset in rules:
+                    # ... (binary packing logic remains the same) ...
+                    physical_value = (raw_value * scale) + offset
+                    
+                    offset = (current_slot % num_slots) * LOG_ENTRY_FORMAT.size
+                    
+                    LOG_ENTRY_FORMAT.pack_into(
+                        mem_view, offset, msg.timestamp, msg.arbitration_id,
+                        name.encode('utf-8'), physical_value
+                    )
+                    index_queue.put(current_slot % num_slots)
+                    current_slot += 1
+                    local_logged_signals.add(name)
+                
+                end_time = time.perf_counter()
+                duration = (end_time - start_time)
+                perf_tracker['processing_total_time'] = perf_tracker.get('processing_total_time', 0) + duration
+                perf_tracker['processing_msg_count'] = perf_tracker.get('processing_msg_count', 0) + 1
+
+            raw_queue.task_done()
+
+        except (KeyboardInterrupt, EOFError):
+            break
+        except Exception:
+            # On any other error, still try to report what was logged
+            results_queue.put(local_logged_signals)
+            if 'raw_queue' in locals() and not raw_queue.empty():
+                raw_queue.task_done()

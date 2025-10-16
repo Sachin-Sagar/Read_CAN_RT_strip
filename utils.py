@@ -1,6 +1,8 @@
 # utils.py
 
 import os
+import cantools
+import bitstruct
 
 def load_signals_to_monitor(file_path):
     """
@@ -54,3 +56,50 @@ def load_signals_to_monitor(file_path):
         print(f"Warning: No valid signals were loaded from '{file_path}'.")
         
     return high_freq_signals, low_freq_signals, id_to_queue_map
+
+def precompile_decoding_rules(db, signals_to_monitor):
+    """
+    Pre-compiles the decoding rules for faster processing.
+
+    This function iterates through the messages and signals we need to monitor
+    and extracts their decoding parameters (bit start, length, scale, offset)
+    into a simple dictionary that can be used for high-speed decoding without
+    relying on the slower, general-purpose cantools methods in the real-time loop.
+
+    Returns a dictionary structured like:
+    {
+        message_id (int): [
+            (signal_name, is_signed, start, length, scale, offset),
+            ...
+        ]
+    }
+    """
+    rules = {}
+    for msg_id_hex, signal_names in signals_to_monitor.items():
+        try:
+            msg_id_int = int(msg_id_hex, 16)
+            message = db.get_message_by_frame_id(msg_id_int)
+            
+            rule_list = []
+            for signal_name in signal_names:
+                signal = message.get_signal_by_name(signal_name)
+                
+                # Create a tuple with all info needed for manual decoding.
+                rule = (
+                    signal.name,
+                    signal.is_signed,
+                    signal.start,
+                    signal.length,
+                    signal.scale,
+                    signal.offset
+                )
+                rule_list.append(rule)
+            
+            if rule_list:
+                rules[msg_id_int] = rule_list
+
+        except KeyError:
+            print(f"Warning: Message ID {msg_id_hex} from signal list not found in DBC file.")
+            continue
+            
+    return rules
