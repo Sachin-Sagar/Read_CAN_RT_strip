@@ -1,7 +1,5 @@
 High-Performance Real-Time CAN Signal Logger
-A lightweight, command-line tool designed for high-performance, real-time logging of specific CAN bus signals, even on buses with mixed high- and low-frequency messages. This application connects to a Kvaser CAN hardware interface, decodes messages using a DBC file, and saves the desired signal data to a timestamped JSON Lines file.
-
-It is built for maximum efficiency and reliability, making it ideal for demanding data acquisition tasks where capturing every message from a high-traffic bus is critical.
+This is a lightweight, command-line tool designed for high-performance, real-time logging of specific CAN bus signals. It connects to a Kvaser CAN hardware interface, decodes messages using a DBC file, and saves the desired signal data to a timestamped JSON Lines file. It is built for maximum efficiency and reliability by utilizing a multiprocessing, shared-memory pipeline to reliably log signals from high-speed (e.g., 10ms cycle time) and low-speed messages simultaneously without data loss.
 
 Features
 Extreme Performance: Utilizes a multiprocessing, shared-memory pipeline to reliably log signals from high-speed (e.g., 10ms cycle time) and low-speed messages simultaneously without data loss.
@@ -14,55 +12,38 @@ Robust JSON Output: Saves data in the JSON Lines (.json) format, where each line
 
 Timestamped Log Files: Automatically creates a new, uniquely named log file with a timestamp for every session.
 
-Configuration-Driven: All settings (CAN parameters, file paths) are managed in a simple config.py file.
+Configuration-Driven: All settings (CAN parameters, file paths, debug flags) are managed in a simple config.py file.
 
 Performance Analytics: Provides a detailed breakdown of the average processing time for each stage of the pipeline upon exit.
 
-The Troubleshooting Journey: A Deep Dive into High-Performance Python
-This project underwent a rigorous debugging process to solve a critical issue where high-frequency (10ms) signals were not being logged. This section documents the evolution of the architecture and the key findings, which serve as a case study for building high-throughput data processing applications in Python.
+System Architecture
+The application's architecture is designed to isolate I/O, maximize CPU usage, and minimize data transfer overhead. This multi-stage pipeline ensures that no single part of the system becomes a bottleneck.
 
-The Core Problem: Silently Dropped Messages
-The initial application successfully logged low-frequency (100ms) signals but silently dropped all high-frequency (10ms) CAN messages. The final report consistently showed these signals as "never logged," even though they were confirmed to be present on the bus using a separate can_sniffer.py script. This proved the issue was within the application's architecture.
+The flow of data is as follows:
 
-Architectural Evolution
-The final, robust architecture was the result of systematically identifying and eliminating a series of bottlenecks.
+CAN Hardware -> CANReader (Thread): A dedicated thread in can_handler.py continuously polls the Kvaser hardware for new messages with a minimal timeout to prevent the hardware's internal buffer from overflowing.
 
-1. Initial Architecture: The I/O Bottleneck
-Finding: The initial multi-threaded design failed because the main thread was responsible for both decoding messages and writing them to a file. Slow disk I/O operations blocked the entire pipeline, causing the CAN hardware's internal buffer to overflow.
+CANReader -> Raw Message Queue: The CANReader places raw can.Message objects into a high-speed multiprocessing.Queue.
 
-Solution: We isolated the I/O operations into a dedicated LogWriter thread. We also implemented batch writing—collecting many log entries in memory and writing them to disk in a single, efficient operation. This dramatically reduced the number of slow write() calls.
+Raw Message Queue -> Worker Pool (Processes): A pool of worker processes (one less than the number of CPU cores) fetches raw messages from the queue. Each process runs in parallel on a different CPU core.
 
-2. The CPU Bottleneck: cantools Decoding
-Finding: With I/O optimized, performance metrics revealed that the cantools.db.decode_message() function was too slow for real-time use, taking dozens of milliseconds per message.
+Worker Pool -> Shared Memory & Index Queue:
 
-Solution: We pre-compiled the decoding rules at startup. A new function, utils.precompile_decoding_rules, extracts all necessary bitwise information (start bit, length, scale, offset) from the DBC file ahead of time. The real-time processing loop was rewritten to perform only simple, lightning-fast bitwise math, removing the expensive cantools dependency from the hot path.
+Inside data_processor.py, each worker uses pre-compiled decoding rules to perform fast, bitwise math to extract the physical value of the signal.
 
-3. The Python GIL and IPC Overhead
-Finding: Even with a highly optimized processing function, the application still dropped messages. The root cause was Python's Global Interpreter Lock (GIL), which prevents multiple threads from executing Python code simultaneously. The CPU-intensive decoding thread was fighting with other threads for CPU time.
+The worker then packs the timestamp, CAN ID, signal name, and physical value into a compact binary format directly into a shared multiprocessing.RawArray.
 
-Solution (Part 1 - Multiprocessing): We replaced the decoding threads with a pool of worker processes. Unlike threads, processes have their own GIL and can run in true parallel on different CPU cores, bypassing the GIL bottleneck.
+Finally, the worker places only a small integer (the index of the slot in the shared memory array) into a separate index queue.
 
-Finding 2: Performance metrics from the multiprocessing version showed that the new bottleneck was the enormous overhead of serializing (pickling) Python objects to send them between processes.
+Index Queue -> LogWriter (Thread): A dedicated thread in log_writer.py retrieves the integer index from the queue.
 
-Solution (Part 2 - Shared Memory): This was the final and most critical optimization. We eliminated expensive object serialization entirely by using a multiprocessing.RawArray, a raw block of memory shared between all processes.
+LogWriter -> JSON File:
 
-Worker processes now decode signals and pack them into a compact binary format directly into this shared memory array.
+The LogWriter uses the index to directly access the shared memory, unpack the binary data, and format it into a JSON string.
 
-They then send only a tiny integer (the index of the data's location) to the logger via a high-speed queue.
+To maximize I/O efficiency, it collects log entries into batches before writing them to the disk in a single, efficient operation.
 
-The LogWriter thread reads the index, accesses the shared memory directly, unpacks the binary data, and creates the final dictionary at the last possible moment.
-
-4. The Final Bottleneck: Hardware Buffer Overflow
-Finding: Despite the highly optimized pipeline, 10ms messages were still being dropped. Diagnostic checks revealed that the CANReader thread, which reads from the hardware, was not being serviced fast enough. The bus.recv(timeout=0.1) call, while non-blocking, could still sleep for up to 100ms, causing the Kvaser hardware's low-level buffer to overflow during that period.
-
-Solution: The timeout in bus.recv() was reduced to a minimal 0.001 seconds. This forces the CANReader thread into a "tight loop," ensuring it is almost constantly polling the hardware for new messages and preventing the input buffer from ever overflowing.
-
-Final Architecture
-This iterative process resulted in a highly efficient, multi-stage pipeline that isolates I/O, maximizes CPU usage, and minimizes data transfer overhead:
-
-CAN Hardware -> CANReader (Thread) -> Raw Message Queue -> Worker Pool (Processes) -> Shared Memory & Index Queue -> LogWriter (Thread) -> JSON File
-
-This design ensures that no single part of the system becomes a bottleneck, combining the reliability of direct hardware reading with the true parallelism required for a high-traffic CAN bus.
+This design combines the reliability of direct hardware reading with the true parallelism required for a high-traffic CAN bus.
 
 Project Structure
 /
@@ -98,21 +79,37 @@ python -m venv .venv
 # On macOS/Linux:
 # source .venv/bin/activate
 3. Install Dependencies
+The project dependencies are managed by pyproject.toml and include python-can and cantools.
+
 Bash
 
 # Install the packages listed in pyproject.toml
 pip install -e .
 Configuration
-Open config.py and modify the constants for your setup:
+All settings are managed in the config.py file.
 
-CAN_INTERFACE: Set to "kvaser".
+Hardware Settings:
+
+CAN_INTERFACE: Set to "kvaser" for Kvaser hardware.
 
 CAN_CHANNEL: Your device's channel number (usually 0).
 
 CAN_BITRATE: The bitrate of your CAN bus (e.g., 500000).
 
-Place your VCU.dbc and master_sigList.txt files in the input/ directory. The signal list format must be CAN_ID,Signal_Name,CycleTime (e.g., 0x123,EngineSpeed,10).
+General Settings:
 
+DEBUG_PRINTING: Set to True to enable verbose diagnostic messages, or False for silent operation.
+
+File Paths and Input Files:
+
+Place your DBC file (e.g., VCU.dbc) and your signal list file (master_sigList.txt) in the input/ directory.
+
+The signal list must be a text file with each line in the format: CAN_ID,Signal_Name,CycleTime.
+
+Example master_sigList.txt:
+
+0x09A,ETS_VCU_Gear_Engaged_St_enum,10
+0x310,ETS_VCU_AccelPedal_Act_perc,100
 Usage
 Ensure your Kvaser hardware is connected and your virtual environment is activated. Execute the script from the project root directory:
 

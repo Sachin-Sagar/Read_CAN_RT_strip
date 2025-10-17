@@ -4,6 +4,7 @@ import can
 import queue
 import threading
 import time
+import config
 
 class CANReader(threading.Thread):
     def __init__(self, bus, data_queues, id_to_queue_map, perf_tracker):
@@ -25,8 +26,16 @@ class CANReader(threading.Thread):
             
             if msg:
                 self.messages_received += 1
-                msg_id_hex = f"0x{msg.arbitration_id:x}"
-                queue_name = self.id_to_queue_map.get(msg_id_hex)
+                
+                msg_id_int = msg.arbitration_id
+                queue_name = self.id_to_queue_map.get(msg_id_int)
+                
+                # --- MODIFICATION: Check debug flag before printing ---
+                if config.DEBUG_PRINTING:
+                    if queue_name:
+                        print(f"DEBUG [CANReader]: Match found! ID: {msg_id_int} (0x{msg_id_int:x}) -> Queue: '{queue_name}'")
+                    else:
+                        print(f"DEBUG [CANReader]: No match for ID: {msg_id_int} (0x{msg_id_int:x})")
                 
                 if queue_name:
                     try:

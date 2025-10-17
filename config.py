@@ -16,6 +16,11 @@ CAN_CHANNEL = 0
 CAN_BITRATE = 500000
 
 
+# --- General Settings ---
+# Set to True to enable verbose debug printing, False to disable.
+DEBUG_PRINTING = False
+
+
 # --- File and Directory Paths ---
 # The script will look for the input files in this directory.
 # The path is relative to the project's root folder.
