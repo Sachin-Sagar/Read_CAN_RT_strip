@@ -17,6 +17,7 @@ requires-python = ">=3.10"
 dependencies = [
     "python-can",
     "cantools",
+    "canlib",
 ]
 
 # Add tool-specific configuration for setuptools here.

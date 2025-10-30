@@ -1,0 +1,1 @@
+savedcmd_/home/sachin/Downloads/linuxcan/pciefd/kvpciefd.o := aarch64-linux-gnu-ld -EL  -maarch64elf -z noexecstack --no-warn-rwx-segments   -r -o /home/sachin/Downloads/linuxcan/pciefd/kvpciefd.o @/home/sachin/Downloads/linuxcan/pciefd/kvpciefd.mod 

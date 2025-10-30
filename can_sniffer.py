@@ -3,11 +3,25 @@
 
 import can
 import time
+import platform
 
-# --- Use the exact same settings as your main application ---
-CAN_INTERFACE = "kvaser"
-CAN_CHANNEL = 0
+# --- Automatically configure the CAN interface based on the OS ---
+# We assume a PCAN adapter is being used.
+
 CAN_BITRATE = 500000
+OS_SYSTEM = platform.system()
+
+if OS_SYSTEM == "Windows":
+    CAN_INTERFACE = "pcan"
+    CAN_CHANNEL = "PCAN_USBBUS1"
+elif OS_SYSTEM == "Linux":
+    CAN_INTERFACE = "socketcan"
+    CAN_CHANNEL = "can0"
+else:
+    print(f"Warning: Unsupported OS '{OS_SYSTEM}'. Defaulting to 'kvaser'.")
+    CAN_INTERFACE = "kvaser"
+    CAN_CHANNEL = 0
+# ----------------------------------------------------------------
 
 def main():
     """Connects to the CAN bus and prints every message received."""

@@ -1,0 +1,1 @@
+savedcmd_/home/sachin/Downloads/linuxcan/usbcanII/usbcanII.mod := printf '%s\n'   usbcanHWIf.o | awk '!x[$$0]++ { print("/home/sachin/Downloads/linuxcan/usbcanII/"$$0) }' > /home/sachin/Downloads/linuxcan/usbcanII/usbcanII.mod

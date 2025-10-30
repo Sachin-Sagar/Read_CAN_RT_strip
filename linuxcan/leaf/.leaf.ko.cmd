@@ -1,0 +1,1 @@
+savedcmd_/home/sachin/Downloads/linuxcan/leaf/leaf.ko := aarch64-linux-gnu-ld -r -EL  -maarch64elf -z noexecstack --no-warn-rwx-segments --build-id=sha1  -T arch/arm64/module.lds -o /home/sachin/Downloads/linuxcan/leaf/leaf.ko /home/sachin/Downloads/linuxcan/leaf/leaf.o /home/sachin/Downloads/linuxcan/leaf/leaf.mod.o /home/sachin/Downloads/linuxcan/leaf/.module-common.o
