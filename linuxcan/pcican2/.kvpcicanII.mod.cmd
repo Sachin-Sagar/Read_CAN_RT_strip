@@ -1,1 +1,0 @@
-savedcmd_/home/sachin/Downloads/linuxcan/pcican2/kvpcicanII.mod := printf '%s\n'   PciCan2HwIf.o memQ.o | awk '!x[$$0]++ { print("/home/sachin/Downloads/linuxcan/pcican2/"$$0) }' > /home/sachin/Downloads/linuxcan/pcican2/kvpcicanII.mod

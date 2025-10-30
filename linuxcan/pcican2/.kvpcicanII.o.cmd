@@ -1,1 +1,0 @@
-savedcmd_/home/sachin/Downloads/linuxcan/pcican2/kvpcicanII.o := aarch64-linux-gnu-ld -EL  -maarch64elf -z noexecstack --no-warn-rwx-segments   -r -o /home/sachin/Downloads/linuxcan/pcican2/kvpcicanII.o @/home/sachin/Downloads/linuxcan/pcican2/kvpcicanII.mod 

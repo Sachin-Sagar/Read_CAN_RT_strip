@@ -1,1 +1,0 @@
-savedcmd_/home/sachin/Downloads/linuxcan/common/kvcommon.o := aarch64-linux-gnu-ld -EL  -maarch64elf -z noexecstack --no-warn-rwx-segments   -r -o /home/sachin/Downloads/linuxcan/common/kvcommon.o @/home/sachin/Downloads/linuxcan/common/kvcommon.mod 

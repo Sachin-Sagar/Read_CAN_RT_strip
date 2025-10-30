@@ -1,1 +1,0 @@
-savedcmd_/home/sachin/Downloads/linuxcan/pcican2/Module.symvers :=  scripts/mod/modpost -M -m -a      -o /home/sachin/Downloads/linuxcan/pcican2/Module.symvers -n -T /home/sachin/Downloads/linuxcan/pcican2/modules.order -i Module.symvers -e -i /home/sachin/Downloads/linuxcan/pcican2/../common/Module.symvers

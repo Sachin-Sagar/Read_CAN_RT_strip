@@ -1,1 +1,0 @@
-savedcmd_/home/sachin/Downloads/linuxcan/common/Module.symvers :=  scripts/mod/modpost -M -m -a      -o /home/sachin/Downloads/linuxcan/common/Module.symvers -n -T /home/sachin/Downloads/linuxcan/common/modules.order -i Module.symvers -e 
