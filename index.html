@@ -35,71 +35,82 @@
             padding: 20px;
             border-radius: 8px;
         }
-        .architecture {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        .flowchart {
-            display: flex;
-            align-items: center;
-            justify-content: space-around;
-            flex-wrap: wrap;
-            gap: 15px;
-            background: #fff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        }
-        .component {
-            background-color: #3498db;
-            color: white;
-            padding: 15px 25px;
-            border-radius: 50px;
-            font-weight: bold;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .process {
-             background-color: #e67e22;
-        }
-        .arrow {
-            font-size: 2em;
-            color: #2c3e50;
-            font-weight: bold;
-        }
-        .data-label {
-            font-style: italic;
-            color: #7f8c8d;
-            margin-top: -10px;
-            margin-bottom: 10px;
-        }
-        .perf-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 15px;
-        }
-        .perf-table th, .perf-table td {
-            border: 1px solid #bdc3c7;
-            padding: 12px;
-            text-align: left;
-        }
-        .perf-table th {
-            background-color: #34495e;
-            color: white;
-        }
-        .perf-table tr:nth-child(even) {
-            background-color: #f2f2f2;
-        }
-        .highlight {
-            background-color: #f1c40f;
-            padding: 2px 6px;
-            border-radius: 4px;
-        }
-        .solution {
-            background-color: #e8f6f3;
-            border-left: 5px solid #1abc9c;
+        .code-block {
+            background-color: #2d2d2d;
+            color: #f1f1f1;
             padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', Courier, monospace;
+            white-space: pre;
+        }
+        .folder-tree ul {
+            list-style-type: none;
+            padding-left: 20px;
+        }
+        .folder-tree li {
+            position: relative;
+            padding-left: 25px;
+            margin-bottom: 5px;
+        }
+        .folder-tree .folder::before {
+            content: '\ud83d\udcc1'; /* Folder icon */
+            position: absolute;
+            left: 0;
+        }
+        .folder-tree .file::before {
+            content: '\ud83d\udcc4'; /* File icon */
+            position: absolute;
+            left: 0;
+        }
+        .parallel-section {
+            margin-top: 40px;
+        }
+        .core-container {
+            display: flex;
+            justify-content: space-between;
+            gap: 15px;
             margin-top: 20px;
         }
+        .core {
+            flex: 1;
+            border: 2px solid;
+            border-radius: 8px;
+            padding: 10px;
+        }
+        .core-1 { border-color: #3498db; }
+        .core-2 { border-color: #e67e22; }
+        .core-3 { border-color: #e67e22; }
+        .core-4 { border-color: #e67e22; }
+
+        .core h4 {
+            text-align: center;
+            margin-top: 0;
+            padding-bottom: 10px;
+            border-bottom: 2px solid;
+        }
+        .core-1 h4 { color: #3498db; border-color: #3498db; }
+        .core-2 h4 { color: #e67e22; border-color: #e67e22; }
+        .core-3 h4 { color: #e67e22; border-color: #e67e22; }
+        .core-4 h4 { color: #e67e22; border-color: #e67e22; }
+
+        .task {
+            background: #ecf0f1;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        .task-io { border-left: 5px solid #3498db; }
+        .task-cpu { border-left: 5px solid #e67e22; }
+        .task-disk { border-left: 5px solid #2ecc71; }
+
+        .down-arrow {
+            text-align: center;
+            font-size: 1.5em;
+            color: #2c3e50;
+            margin: 5px 0;
+        }
+
     </style>
 </head>
 <body>
@@ -108,54 +119,107 @@
 
     <div class="container">
         <div class="main-content">
-            <h2>The Debugging Journey: From Bottlenecks to Breakthrough</h2>
-            <p>Our goal was to build a highly reliable logger for both high and low-frequency CAN signals. While we successfully solved major performance challenges, we were left with a persistent bug where 10ms signals were not being logged. This document outlines our troubleshooting process and the final solution.</p>
 
-            <h3>Stage 1: Eliminating Architectural Bottlenecks</h3>
-            <p>We evolved the application through several stages to achieve the necessary performance:</p>
-            <ul>
-                <li><strong>I/O Bottleneck:</strong> Moved file writing to a dedicated thread with batch processing to prevent blocking.</li>
-                <li><strong>CPU Bottleneck (GIL):</strong> Replaced CPU-intensive decoding threads with a pool of parallel processes to bypass the Global Interpreter Lock.</li>
-                <li><strong>IPC Overhead:</strong> Implemented a shared memory array (`multiprocessing.RawArray`) to eliminate slow data serialization between processes, moving from passing large objects to only passing a tiny integer index.</li>
-                <li><strong>Hardware Buffer Overflow:</strong> Reduced the `bus.recv()` timeout to a minimum, ensuring the hardware's internal buffer was polled constantly and never overflowed.</li>
-            </ul>
-            <p>After these optimizations, performance was excellent, but the 10ms signals were still missing. This proved the issue was not performance-related.</p>
+            <div class="folder-tree">
+                <h3>Project Structure</h3>
+                <ul>
+                    <li class="folder">input/
+                        <ul>
+                            <li class="file">VCU.dbc</li>
+                            <li class="file">master_sigList.txt</li>
+                        </ul>
+                    </li>
+                    <li class="folder">output/</li>
+                    <li class="file">main.py</li>
+                    <li class="file">config.py</li>
+                    <li class="file">utils.py</li>
+                    <li class="file">can_handler.py</li>
+                    <li class="file">data_processor.py</li>
+                    <li class="file">log_writer.py</li>
+                    <li class="file">pyproject.toml</li>
+                </ul>
+            </div>
 
-            <h3>The Final Breakthrough: The Root Cause</h3>
-            <div class="solution">
-                <p>The final problem was a subtle but critical data mismatch. The CAN IDs for our 10ms signals were stored with a leading zero in the signal list (e.g., <code>'0x09a'</code>), but the live CAN message parser generated an unpadded string (e.g., <code>'0x9a'</code>). </p>
-                <p>Because the strings did not match exactly, the dictionary lookup failed, and the high-frequency messages were silently dropped. The low-frequency signals worked because their IDs didn't have this padding discrepancy.</p>
-                <p><strong>The fix is to standardize on using integer CAN IDs for all lookups, which completely removes any string formatting ambiguity.</strong></p>
+            <div>
+                <h3>Sequence of Function Calls</h3>
+                <div class="code-block">
+main.py: main()
+  └─ utils.load_signals_to_monitor()
+  └─ utils.precompile_decoding_rules()
+  └─ can.interface.Bus()
+  └─ CANReader.start()
+  └─ LogWriter.start()
+  └─ multiprocessing.Process(target=processing_worker).start() (x3)
+     └─ processing_worker()
+        └─ raw_queue.get()
+        └─ index_queue.put()
+  └─ ... (shutdown sequence)
+                </div>
+            </div>
+
+            <div class="parallel-section">
+                <h2>Worker Process Initialization</h2>
+                <p>The main process pre-compiles the decoding rules from the DBC file into a lightweight, serializable dictionary. This dictionary is then passed to each worker process upon creation. This ensures that the expensive DBC parsing happens only once, and the workers start up quickly with all the information they need.</p>
+            </div>
+            
+            <div class="parallel-section">
+                <h2>4-Core Parallel Processing Example</h2>
+                <p>The application leverages a multi-core architecture to achieve high throughput. Here is how the tasks are distributed across 4 CPU cores to maximize parallelism and avoid bottlenecks. The worker cores (2, 3, and 4) all run the exact same code but operate on different messages pulled from the queue, achieving data parallelism.</p>
+
+                <div class="core-container">
+                    <!-- Core 1: I/O Threads -->
+                    <div class="core core-1">
+                        <h4>Core 1 (I/O)</h4>
+                        <div class="task task-io">
+                            <strong>CANReader Thread</strong>
+                            <p>Polls CAN hardware</p>
+                        </div>
+                        <div class="down-arrow">&darr;</div>
+                        <div class="task task-disk">
+                            <strong>LogWriter Thread</strong>
+                            <p>Writes to JSON file</p>
+                        </div>
+                    </div>
+
+                    <!-- Core 2: Worker Process -->
+                    <div class="core core-2">
+                        <h4>Core 2 (CPU)</h4>
+                        <div class="task task-cpu">
+                            <strong>Worker Process 1</strong>
+                            <p>1. Grabs Message A<br>2. Decodes Signals<br>3. Writes to Shared Memory</p>
+                        </div>
+                    </div>
+
+                    <!-- Core 3: Worker Process -->
+                    <div class="core core-3">
+                        <h4>Core 3 (CPU)</h4>
+                        <div class="task task-cpu">
+                            <strong>Worker Process 2</strong>
+                            <p>1. Grabs Message B<br>2. Decodes Signals<br>3. Writes to Shared Memory</p>
+                        </div>
+                    </div>
+
+                    <!-- Core 4: Worker Process -->
+                    <div class="core core-4">
+                        <h4>Core 4 (CPU)</h4>
+                        <div class="task task-cpu">
+                            <strong>Worker Process 3</strong>
+                            <p>1. Grabs Message C<br>2. Decodes Signals<br>3. Writes to Shared Memory</p>
+                        </div>
+                    </div>
+                </div>
+
+                <h4>Execution Flow:</h4>
+                <ol>
+                    <li><strong>Core 1:</strong> The `CANReader` thread continuously reads from the CAN bus and places raw messages into a shared queue.</li>
+                    <li><strong>Cores 2, 3, 4:</strong> The three `Worker` processes run in a true parallel pool. They independently grab messages from the queue (e.g., Core 2 gets Message A, Core 3 gets Message B), perform the CPU-intensive decoding, and write the results to a shared memory block.</li>
+                    <li><strong>Core 1:</strong> The `LogWriter` thread periodically wakes up, retrieves data from shared memory, and writes it to the disk, ensuring the CPU-bound workers are never blocked by file I/O.</li>
+                </ol>
             </div>
 
         </div>
 
         <div class="sidebar">
-            <h2>System Architecture</h2>
-            <div class="architecture">
-                <div class="flowchart">
-                    <div class="component">CAN Bus</div>
-                    <div class="arrow">&rarr;</div>
-                    <div class="component">CANReader<br>(Thread)</div>
-                </div>
-                <div class="data-label">Raw Messages</div>
-                <div class="flowchart">
-                    <div class="arrow">&darr;</div>
-                </div>
-                 <div class="flowchart">
-                    <div class="component process">Worker Pool<br>(Processes)</div>
-                </div>
-                 <div class="data-label">Integer Index + Shared Memory</div>
-                <div class="flowchart">
-                    <div class="arrow">&darr;</div>
-                </div>
-                <div class="flowchart">
-                     <div class="component">LogWriter<br>(Thread)</div>
-                    <div class="arrow">&rarr;</div>
-                    <div class="component">JSON File</div>
-                </div>
-            </div>
-
             <h3>Final Performance Metrics</h3>
             <table class="perf-table">
                 <thead>

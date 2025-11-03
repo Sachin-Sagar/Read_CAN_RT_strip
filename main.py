@@ -25,6 +25,27 @@ def main():
 
     print("--- Real-Time CAN Logger ---")
 
+    # --- Pre-flight checks: Bring up CAN interface on Linux ---
+    if config.OS_SYSTEM == "Linux":
+        print("\n[+] Ensuring CAN interface is up...")
+        command = f"sudo ip link set {config.CAN_CHANNEL} up type can bitrate {config.CAN_BITRATE}"
+        print(f" -> Running: {command}")
+        
+        import subprocess
+        result = subprocess.run(command, shell=True, capture_output=True, text=True)
+        
+        if result.returncode != 0:
+            # If the error contains "Device or resource busy", it means the interface is already up.
+            if "Device or resource busy" in result.stderr:
+                print(f" -> Interface '{config.CAN_CHANNEL}' is already up. Continuing.")
+            else:
+                print(f"Error: Failed to bring up CAN interface '{config.CAN_CHANNEL}'.")
+                print(f" -> STDERR: {result.stderr.strip()}")
+                print(" -> Please check your CAN hardware and drivers.")
+                return # Exit if we can't bring up the interface
+        else:
+            print(f" -> Interface '{config.CAN_CHANNEL}' brought up successfully.")
+
     # --- 1. Load Configuration ---
     print("\n[+] Loading configuration...")
     dbc_path = os.path.join(config.INPUT_DIRECTORY, config.DBC_FILE)
@@ -148,12 +169,21 @@ def main():
         
         unseen_signals = all_monitoring_signals - logged_signals_set
 
+        # --- Final Report: Logged and Unseen Signals ---
+        print("\n--- Data Logging Summary ---")
+        if logged_signals_set:
+            print("The following signals were successfully logged at least once:")
+            for signal in sorted(list(logged_signals_set)):
+                print(f" - [LOGGED] {signal}")
+        else:
+            print("Warning: No signals from the monitoring list were logged.")
+
         if unseen_signals:
-            print("\nWarning: The following signals were never logged:")
+            print("\nThe following signals were on the monitoring list but were NEVER logged:")
             for signal in sorted(list(unseen_signals)):
-                print(f" - {signal}")
+                print(f" - [UNSEEN] {signal}")
         elif logged_signals_set:
-            print("\n -> All signals in the monitoring list were logged at least once.")
+            print("\n -> All signals in the monitoring list were logged successfully.")
         
         print(" -> Logging complete.")
         

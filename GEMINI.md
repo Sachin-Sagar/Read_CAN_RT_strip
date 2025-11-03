@@ -1,10 +1,10 @@
-Project Overview
+# Project Overview
 
 This project is a high-performance, real-time CAN signal logger. It's a command-line tool written in Python that connects to a CAN hardware interface, decodes messages using a DBC file, and saves specific signal data to a timestamped JSON Lines file.
 
 The architecture is designed for high performance and reliability, using a multiprocessing, shared-memory pipeline to log signals from high-speed and low-speed messages simultaneously without data loss.
 
-Building and Running (PCAN / SocketCAN)
+# Building and Running (PCAN / SocketCAN)
 
 1. Prerequisites
 
@@ -68,7 +68,7 @@ python main.py
 
 The logger will start and save data to the output/ folder. To stop, press Ctrl+C.
 
-The Debugging Journey: From Kvaser Failure to PCAN Success
+# The Debugging Journey: From Kvaser Failure to PCAN Success
 
 This project was originally developed for Kvaser hardware, but significant issues were encountered when migrating to a Linux (Raspberry Pi) environment. This document outlines the debugging process that led to a successful hardware migration.
 
@@ -120,11 +120,11 @@ With the Kvaser proprietary stack deemed unworkable, we migrated to the standard
 
             Fix: Added a mandatory step for Linux users to run sudo ip link set can0 up type can bitrate 500000 before starting the script.
 
-Final Conclusion
+# Final Conclusion
 
 The migration was 100% successful. The application is now fully functional on both Windows and Raspberry Pi (Linux) using PCAN hardware. The original driver incompatibility was completely bypassed by moving to the stable, kernel-integrated SocketCAN interface (peak_usb).
 
-Development Conventions
+# Development Conventions
 
     The project uses a modular structure, with clear separation of concerns between the different components of the pipeline.
 
