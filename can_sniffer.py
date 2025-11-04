@@ -5,29 +5,58 @@ import can
 import time
 import platform
 
-# --- Automatically configure the CAN interface based on the OS ---
-# We assume a PCAN adapter is being used.
+import can
+import time
+import platform
 
+# --- Configuration ---
 CAN_BITRATE = 500000
 OS_SYSTEM = platform.system()
 
-if OS_SYSTEM == "Windows":
-    CAN_INTERFACE = "pcan"
-    CAN_CHANNEL = "PCAN_USBBUS1"
-elif OS_SYSTEM == "Linux":
-    CAN_INTERFACE = "socketcan"
-    CAN_CHANNEL = "can0"
-else:
-    print(f"Warning: Unsupported OS '{OS_SYSTEM}'. Defaulting to 'kvaser'.")
-    CAN_INTERFACE = "kvaser"
-    CAN_CHANNEL = 0
+def choose_can_interpreter():
+    """Prompts the user to select a CAN interpreter."""
+    while True:
+        print("Please select your CAN interpreter:")
+        print("  1: PCAN (Peak)")
+        print("  2: Kvaser")
+        choice = input("Enter your choice (1 or 2): ")
+        if choice == '1':
+            return "peak"
+        elif choice == '2':
+            return "kvaser"
+        else:
+            print("Invalid choice. Please try again.")
+
+def get_can_config(interpreter):
+    """Returns the CAN interface and channel for the given interpreter and OS."""
+    if interpreter == "peak":
+        if OS_SYSTEM == "Windows":
+            return "pcan", "PCAN_USBBUS1"
+        elif OS_SYSTEM == "Linux":
+            return "socketcan", "can0"
+    elif interpreter == "kvaser":
+        if OS_SYSTEM == "Windows":
+            return "kvaser", 0
+        elif OS_SYSTEM == "Linux":
+            return "kvaser", 0
+    return None, None
+
 # ----------------------------------------------------------------
 
 def main():
     """Connects to the CAN bus and prints every message received."""
     
     print("--- CAN Bus Sniffer ---")
-    print(f"Attempting to connect to {CAN_INTERFACE} channel {CAN_CHANNEL} at {CAN_BITRATE} bps...")
+
+    # --- Get CAN Configuration ---
+    interpreter = choose_can_interpreter()
+    can_interface, can_channel = get_can_config(interpreter)
+
+    if can_interface is None:
+        print(f"Error: Unsupported OS '{OS_SYSTEM}' for interpreter '{interpreter}'")
+        return
+
+    print(f"Attempting to connect to {can_interface} channel {can_channel} at {CAN_BITRATE} bps...")
     
     bus = None
     # --- Performance Tracking Variables ---

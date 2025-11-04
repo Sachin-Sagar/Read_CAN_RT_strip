@@ -21,9 +21,28 @@ def main():
     from can_handler import CANReader
     from data_processor import processing_worker, LOG_ENTRY_FORMAT
     from log_writer import LogWriter
-    # --------------------------------------------------------
+    import importlib
+
+    def choose_can_interpreter():
+        """Prompts the user to select a CAN interpreter."""
+        while True:
+            print("Please select your CAN interpreter:")
+            print("  1: PCAN (Peak)")
+            print("  2: Kvaser")
+            choice = input("Enter your choice (1 or 2): ")
+            if choice == '1':
+                return "peak"
+            elif choice == '2':
+                return "kvaser"
+            else:
+                print("Invalid choice. Please try again.")
 
     print("--- Real-Time CAN Logger ---")
+
+    # --- Choose CAN Interpreter ---
+    selected_interpreter = choose_can_interpreter()
+    config.CAN_INTERPRETER = selected_interpreter
+    importlib.reload(config) # Reload config to apply changes
 
     # --- Pre-flight checks: Bring up CAN interface on Linux ---
     if config.OS_SYSTEM == "Linux":

@@ -40,17 +40,24 @@ pip install -e .
 
 4. Configuration
 
-All hardware settings are now auto-configured in config.py and can_sniffer.py.
+Hardware settings are now selected at runtime.
 
-    The script detects the OS (Windows or Linux).
+    When you run the application (`python main.py`), you will be prompted to choose your CAN interpreter (PCAN or Kvaser).
 
-    On Windows, it uses the pcan interface.
+    The script then automatically configures the correct interface and channel based on your selection and operating system.
 
-    On Linux, it uses the socketcan interface with channel "can0".
-
-Place your DBC file and signal list file in the input/ directory.
+Place your DBC file and signal list file in the `input/` directory.
 
 5. Running the Application
+
+When you start the application, it will first ask you to select your CAN interpreter:
+
+```
+Please select your CAN interpreter:
+  1: PCAN (Peak)
+  2: Kvaser
+Enter your choice (1 or 2):
+```
 
 On Linux (e.g., Raspberry Pi)
 
@@ -102,27 +109,30 @@ With the Kvaser proprietary stack deemed unworkable, we migrated to the standard
 
         Result: lsmod | grep peak_usb succeeded, showing the driver was already loaded in the kernel. This confirmed PCAN was a viable path.
 
-    Implementation: The code was modified to support PCAN.
+    Implementation: The code was modified to support both PCAN and Kvaser.
 
-        config.py and can_sniffer.py were updated to use platform.system() to auto-detect the OS.
+        `config.py` and `main.py` were updated to allow the user to select their desired CAN interpreter at runtime.
 
-        Windows: Uses CAN_INTERFACE = "pcan".
-
-        Linux: Uses CAN_INTERFACE = "socketcan".
+        For PCAN:
+            Windows: Uses `CAN_INTERFACE = "pcan"`.
+            Linux: Uses `CAN_INTERFACE = "socketcan"`.
+        For Kvaser:
+            Windows: Uses `CAN_INTERFACE = "kvaser"`.
+            Linux: Uses `CAN_INTERFACE = "kvaser"`.
 
     Final Errors & Solutions:
 
-        Error: TypeError: expected str, bytes or os.PathLike object, not int
+        Error: `TypeError: expected str, bytes or os.PathLike object, not int`
 
-            Fix: Changed CAN_CHANNEL in config.py from 0 to "can0" for the Linux/SocketCAN configuration.
+            Fix: Changed `CAN_CHANNEL` in `config.py` from `0` to `"can0"` for the Linux/SocketCAN configuration.
 
-        Error: OSError: [Errno 100] Network is down
+        Error: `OSError: [Errno 100] Network is down`
 
-            Fix: Added a mandatory step for Linux users to run sudo ip link set can0 up type can bitrate 500000 before starting the script.
+            Fix: Added a mandatory step for Linux users to run `sudo ip link set can0 up type can bitrate 500000` before starting the script.
 
 # Final Conclusion
 
-The migration was 100% successful. The application is now fully functional on both Windows and Raspberry Pi (Linux) using PCAN hardware. The original driver incompatibility was completely bypassed by moving to the stable, kernel-integrated SocketCAN interface (peak_usb).
+The application is now fully functional on both Windows and Raspberry Pi (Linux) using either PCAN or Kvaser hardware. The user can select their preferred CAN interpreter at runtime.
 
 # Development Conventions
 

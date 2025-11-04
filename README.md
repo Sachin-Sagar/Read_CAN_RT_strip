@@ -5,7 +5,8 @@ This is a lightweight, command-line tool designed for high-performance, real-tim
 ## Features
 
 * **Extreme Performance:** Utilizes a multiprocessing, shared-memory pipeline to reliably log signals from high-speed (e.g., 10ms cycle time) and low-speed messages simultaneously without data loss.
-* **Cross-Platform:** Automatically detects the host operating system (Windows or Linux) and selects the correct CAN backend (`pcan` or `socketcan`).
+* **Multi-Hardware Support:** Supports both PCAN and Kvaser hardware. The user is prompted to select the interpreter at runtime.
+* **Cross-Platform:** Automatically configures the correct CAN backend (`pcan`, `socketcan`, or `kvaser`) based on the user's hardware choice and operating system.
 * **Selective Logging:** Parses a user-defined list of signals to log only the data you need, reducing noise and file size.
 * **DBC-Based Decoding:** Uses an industry-standard .dbc file to decode raw CAN messages into human-readable physical values.
 * **Robust JSON Output:** Saves data in the JSON Lines (.json) format, where each line is a valid JSON object.
@@ -44,13 +45,17 @@ The application's architecture is designed to isolate I/O, maximize CPU usage, a
 ### 1. Prerequisites
 
 *   Python 3.10 or newer.
-*   **Hardware:** A **PCAN-USB** adapter is recommended.
-*   **Drivers (Windows):** Install the [PCAN-Basic drivers](https://www.peak-system.com/PCAN-Basic.239.0.html?&L=1) for the `python-can` library to detect your hardware.
-*   **Drivers (Linux):** Install `can-utils` for system-level CAN management.
-    ```bash
-    sudo apt update
-    sudo apt install can-utils
-    ```
+*   **Hardware:** A **PCAN-USB** or **Kvaser** adapter.
+*   **Drivers (Windows):**
+    *   For PCAN, install the [PCAN-Basic drivers](https://www.peak-system.com/PCAN-Basic.239.0.html?&L=1).
+    *   For Kvaser, install the [Kvaser CANlib drivers](https://www.kvaser.com/download/).
+*   **Drivers (Linux):**
+    *   For PCAN, install `can-utils` for system-level CAN management.
+        ```bash
+        sudo apt update
+        sudo apt install can-utils
+        ```
+    *   For Kvaser, ensure the Kvaser CANlib drivers are installed and the `kvaser_usb` kernel module is loaded if using the SocketCAN interface, or that the proprietary Kvaser `canlib` is correctly set up for the `kvaser` interface.
 
 ### 2. Create a Virtual Environment
 
@@ -78,10 +83,7 @@ pip install -e .
 
 ### 4. Configuration
 
-*   **Hardware (Automatic):** The script now auto-detects your OS and configures the CAN hardware settings.
-    *   On **Windows**, it selects the `pcan` interface.
-    *   On **Linux**, it selects the `socketcan` interface with channel `can0`.
-    *   If you need to change the bitrate or PCAN channel name, you can edit the `config.py` file directly.
+*   **Hardware (Runtime Selection):** When you run the application, you will be prompted to select your CAN interpreter (PCAN or Kvaser). The script then automatically configures the appropriate settings for your operating system.
 *   **Files and Signals:**
     *   Place your DBC file (e.g., `VCU.dbc`) in the `input/` directory.
     *   Place your signal list (`master_sigList.txt`) in the `input/` directory.
@@ -96,13 +98,22 @@ pip install -e .
 
 ## Usage
 
-Ensure your PCAN hardware is connected and your virtual environment is activated.
+Ensure your CAN hardware is connected and your virtual environment is activated.
+
+When you start the application, it will first ask you to select your CAN interpreter:
+
+```
+Please select your CAN interpreter:
+  1: PCAN (Peak)
+  2: Kvaser
+Enter your choice (1 or 2):
+```
 
 ### On Linux (e.g., Raspberry Pi)
 
-You **must** bring the CAN interface up manually before running the script.
+If you are using PCAN with SocketCAN, you **must** bring the CAN interface up manually before running the script.
 
-1.  **Bring the interface up:**
+1.  **Bring the interface up (PCAN/SocketCAN only):**
     ```bash
     sudo ip link set can0 up type can bitrate 500000
     ```

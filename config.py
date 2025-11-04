@@ -6,26 +6,43 @@ import platform
 # Modify the values here to match your setup.
 
 # --- CAN Hardware Settings ---
-# Automatically configure the CAN interface based on the operating system.
-# We assume a PCAN adapter is being used.
+
+# Select the CAN interpreter. Options: 'peak', 'kvaser'
+# This will be updated dynamically by the user's choice in main.py.
+CAN_INTERPRETER = "peak"
 
 CAN_BITRATE = 500000
 OS_SYSTEM = platform.system()
 
-if OS_SYSTEM == "Windows":
-    CAN_INTERFACE = "pcan"
-    # This is the default channel for the PCAN-USB adapter on Windows.
-    # You may need to change "PCAN_USBBUS1" if you have multiple adapters.
-    CAN_CHANNEL = "PCAN_USBBUS1"
-elif OS_SYSTEM == "Linux":
-    CAN_INTERFACE = "socketcan"
-    # This is the default channel for SocketCAN on Linux.
-    CAN_CHANNEL = "can0"
+# Default values, to be overridden by the logic below
+CAN_INTERFACE = None
+CAN_CHANNEL = None
+
+if CAN_INTERPRETER == "peak":
+    if OS_SYSTEM == "Windows":
+        CAN_INTERFACE = "pcan"
+        CAN_CHANNEL = "PCAN_USBBUS1"
+    elif OS_SYSTEM == "Linux":
+        CAN_INTERFACE = "socketcan"
+        CAN_CHANNEL = "can0"
+elif CAN_INTERPRETER == "kvaser":
+    if OS_SYSTEM == "Windows":
+        # On Windows, Kvaser uses the canlib library directly
+        CAN_INTERFACE = "kvaser"
+        CAN_CHANNEL = 0 # Typically the first channel is 0
+    elif OS_SYSTEM == "Linux":
+        # On Linux, Kvaser also uses the canlib library
+        CAN_INTERFACE = "kvaser"
+        CAN_CHANNEL = 0 # Typically the first channel is 0
 else:
-    # Default to Kvaser or raise an error if unsupported OS
-    print(f"Warning: Unsupported OS '{OS_SYSTEM}'. Defaulting to 'kvaser'.")
-    CAN_INTERFACE = "kvaser"
-    CAN_CHANNEL = 0
+    print(f"Error: Unknown CAN_INTERPRETER: {CAN_INTERPRETER}")
+    # Exit or handle the error as appropriate
+    exit()
+
+if CAN_INTERFACE is None:
+    print(f"Error: Unsupported OS '{OS_SYSTEM}' for CAN_INTERPRETER '{CAN_INTERPRETER}'")
+    # Exit or handle the error as appropriate
+    exit()
 
 
 # --- General Settings ---
